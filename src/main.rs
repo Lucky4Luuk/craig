@@ -52,10 +52,12 @@ async fn gen_craig(message: ChatMessage, channel_id: u64) -> String {
 
     let res = OLLAMA.generate(GenerationRequest::new(model, prompt)).await;
 
-    if let Ok(res) = res {
-        res.response
-    } else {
-        String::from("craig too retarded to give you an answer to this")
+    match res {
+        Ok(r) => r.response,
+        Err(e) => {
+            println!("e: {:?}", e);
+            String::from("craig too retarded to give you an answer to this")
+        }
     }
 }
 
@@ -64,15 +66,17 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        println!("msg");
-        if msg.content.to_lowercase().contains("craig") || msg.mentions_me(&ctx.http).await.unwrap_or(false) {
-            println!("yipee thats for me");
-            let resp = gen_craig(ChatMessage {
-                username: msg.author.name.clone(),
-                content: msg.content.clone()
-            }, msg.channel_id.get()).await;
-            if let Err(e) = msg.reply_ping(&ctx.http, resp).await {
-                println!("e: {:?}", e);
+        if msg.author != **ctx.cache.current_user() {
+            println!("msg");
+            if msg.content.to_lowercase().contains("craig") || msg.mentions_me(&ctx.http).await.unwrap_or(false) {
+                println!("yipee thats for me");
+                let resp = gen_craig(ChatMessage {
+                    username: msg.author.name.clone(),
+                    content: msg.content.clone()
+                }, msg.channel_id.get()).await;
+                if let Err(e) = msg.reply_ping(&ctx.http, resp).await {
+                    println!("e: {:?}", e);
+                }
             }
         }
     }
