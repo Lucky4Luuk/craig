@@ -40,23 +40,23 @@ async fn get_history_and_push(prompt: ChatMessage, channel_id: u64) -> Vec<ChatM
 }
 
 async fn gen_craig(message: ChatMessage, channel_id: u64) -> String {
-    let model = "llama2:latest".to_string();
+    let model = "mistral:latest".to_string();
     // let prompt = "Why is the sky blue?".to_string();
     let mut prompt = String::new();
-    prompt.push_str(format!("<|im_start|>system\n{SYSTEM_MESSAGE}<|im_end|>\n"));
+    prompt.push_str(&format!("<|im_start|>system\n{SYSTEM_MESSAGE}<|im_end|>\n"));
     let history = get_history_and_push(message.clone(), channel_id).await;
     for msg in history {
-        prompt.push_str(format!("<|im_start|>{}\n{}<|im_end|>\n"));
+        prompt.push_str(&format!("<|im_start|>{}\n{}<|im_end|>\n", msg.username, msg.content));
     }
-    prompt.push_str(format!("<|im_start|>Craig"));
+    prompt.push_str(&format!("<|im_start|>Craig"));
 
     let res = OLLAMA.generate(GenerationRequest::new(model, prompt)).await;
 
     if let Ok(res) = res {
-        panic!("{}", res.response);
+        res.response
+    } else {
+        String::from("craig too retarded to give you an answer to this")
     }
-
-    todo!()
 }
 
 struct Handler;
@@ -64,10 +64,11 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!ping" {
-            if let Err(why) = msg.channel_id.say(&ctx.http, "Pong!").await {
-                println!("Error sending message: {why:?}");
-            }
+        if msg.content.to_lowercase().contains("craig") || msg.mentions_me(&ctx.http).await.unwrap_or(false) {
+            let resp = gen_craig(ChatMessage {
+                username: msg.author.name.clone(),
+                content: msg.content.clone()
+            }, msg.channel_id.get()).await;
         }
     }
 }
