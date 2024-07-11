@@ -57,7 +57,7 @@ async fn update_history(channel_id: u64, ctx: GenerationContext) {
 }
 
 async fn gen_craig(message: ChatMessage, channel_id: u64) -> String {
-    let model = "dolphin-llama3:8b".to_string();
+    let model = "tinydolphin".to_string();
 
     let prompt = format!("{}: {}", message.username, message.content);
     let context = get_history(channel_id).await;
