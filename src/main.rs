@@ -64,11 +64,16 @@ struct Handler;
 #[async_trait]
 impl EventHandler for Handler {
     async fn message(&self, ctx: Context, msg: Message) {
+        println!("msg");
         if msg.content.to_lowercase().contains("craig") || msg.mentions_me(&ctx.http).await.unwrap_or(false) {
+            println!("yipee thats for me");
             let resp = gen_craig(ChatMessage {
                 username: msg.author.name.clone(),
                 content: msg.content.clone()
             }, msg.channel_id.get()).await;
+            if let Err(e) = msg.reply_ping(&ctx.http, resp).await {
+                println!("e: {:?}", e);
+            }
         }
     }
 }
