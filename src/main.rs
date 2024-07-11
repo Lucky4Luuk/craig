@@ -9,10 +9,13 @@ use lazy_static::lazy_static;
 
 use ollama_rs::{
     Ollama,
-    generation::completion::request::GenerationRequest,
+    generation::completion::{
+        GenerationContext,
+        request::GenerationRequest
+    },
 };
 
-static SYSTEM_MESSAGE: &'static str = "You are Craig. You are a racist british man with white heritage. You are also schizophrenic. A child by the name of NotButter is fat and is 2% African.";
+static SYSTEM_MESSAGE: &'static str = "KEEP ALL ANSWERS RELATIVELY SHORT. You are Craig. You are a racist british man with white heritage. You are also schizophrenic. You live in a low income neighbourhood in Nottingham, surrounded by Pakistanis. Your wife left you at 38 and your life is quickly going downhill. You are going through a schizophrenic midlife crisis. A child by the name of NotButter is fat and 2% African.";
 
 #[derive(Clone, Debug)]
 struct ChatMessage {
@@ -23,37 +26,40 @@ struct ChatMessage {
 lazy_static! {
     static ref OLLAMA: Ollama = Ollama::default();
 
-    static ref HISTORY: Mutex<HashMap<u64, Vec<ChatMessage>>> = Mutex::new(HashMap::new());
+    static ref HISTORY: Mutex<HashMap<u64, GenerationContext>> = Mutex::new(HashMap::new());
 }
 
-async fn get_history_and_push(prompt: ChatMessage, channel_id: u64) -> Vec<ChatMessage> {
+async fn get_history(channel_id: u64) -> Option<GenerationContext> {
     let mut lock = HISTORY.lock().await;
-    if !lock.contains_key(&channel_id) { lock.insert(channel_id, Vec::new()); }
-    let history = lock.get(&channel_id).unwrap().clone();
-    let mut modified = history.clone();
-    modified.push(prompt);
-    if modified.len() > 6 {
-        modified.remove(0);
-    }
-    lock.insert(channel_id, modified);
-    history
+    lock.get(&channel_id).cloned()
+}
+
+async fn update_history(channel_id: u64, ctx: GenerationContext) {
+    let mut lock = HISTORY.lock().await;
+    lock.insert(channel_id, ctx);
 }
 
 async fn gen_craig(message: ChatMessage, channel_id: u64) -> String {
-    let model = "mistral:latest".to_string();
-    // let prompt = "Why is the sky blue?".to_string();
-    let mut prompt = String::new();
-    prompt.push_str(&format!("<|im_start|>system\n{SYSTEM_MESSAGE}<|im_end|>\n"));
-    let history = get_history_and_push(message.clone(), channel_id).await;
-    for msg in history {
-        prompt.push_str(&format!("<|im_start|>{}\n{}<|im_end|>\n", msg.username, msg.content));
-    }
-    prompt.push_str(&format!("<|im_start|>Craig"));
+    let model = "dolphin-mixtral:8x7b".to_string();
 
-    let res = OLLAMA.generate(GenerationRequest::new(model, prompt)).await;
+    let prompt = format!("{}: {}", message.username, message.content);
+    let context = get_history(channel_id).await;
+
+    let mut req = GenerationRequest::new(model, prompt).system(SYSTEM_MESSAGE.to_string());
+    if let Some(ctx) = context {
+        req = req.context(ctx);
+    }
+    let res = OLLAMA.generate(req).await;
 
     match res {
-        Ok(r) => r.response,
+        Ok(r) => {
+            if let Some(ctx) = r.context {
+                update_history(channel_id, ctx).await;
+            } else {
+                println!("NO CONTEXT !!!");
+            }
+            r.response
+        },
         Err(e) => {
             println!("e: {:?}", e);
             String::from("craig too retarded to give you an answer to this")
@@ -70,10 +76,16 @@ impl EventHandler for Handler {
             println!("msg");
             if msg.content.to_lowercase().contains("craig") || msg.mentions_me(&ctx.http).await.unwrap_or(false) {
                 println!("yipee thats for me");
+                msg.react(&ctx.http, serenity::model::channel::ReactionType::Custom {
+                    animated: false,
+                    id: 1114296581064245369.into(),
+                    name: Some(String::from("thinking_rn")),
+                }).await;
                 let resp = gen_craig(ChatMessage {
                     username: msg.author.name.clone(),
                     content: msg.content.clone()
                 }, msg.channel_id.get()).await;
+                println!("done thinking !!!");
                 if let Err(e) = msg.reply_ping(&ctx.http, resp).await {
                     println!("e: {:?}", e);
                 }
