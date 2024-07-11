@@ -9,6 +9,7 @@ use lazy_static::lazy_static;
 
 use ollama_rs::{
     Ollama,
+    generation::options::GenerationOptions,
     generation::completion::{
         GenerationContext,
         request::GenerationRequest
@@ -45,7 +46,7 @@ async fn gen_craig(message: ChatMessage, channel_id: u64) -> String {
     let prompt = format!("{}: {}", message.username, message.content);
     let context = get_history(channel_id).await;
 
-    let mut req = GenerationRequest::new(model, prompt).system(SYSTEM_MESSAGE.to_string());
+    let mut req = GenerationRequest::new(model, prompt).system(SYSTEM_MESSAGE.to_string()).options(GenerationOptions::default().num_ctx(1024).temperature(1.2));
     if let Some(ctx) = context {
         req = req.context(ctx);
     }
