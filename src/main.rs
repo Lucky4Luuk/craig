@@ -75,16 +75,21 @@ async fn gen_craig(message: ChatMessage, channel_id: u64) -> anyhow::Result<Stri
 
     let request = CreateChatCompletionRequestArgs::default()
         .max_tokens(256u32)
-        .model("undi95/toppy-m-7b:free")
+        // .model("undi95/toppy-m-7b:free")
+        .model("gryphe/mythomist-7b:free")
         .messages(full_ctx)
+        .temperature(4.0)
         .build()?;
 
     let mut resp = None;
     let mut attempt = 0;
     while attempt < 5 {
-        if let Ok(response) = client.chat().create(request.clone()).await {
-            resp = Some(response.choices.iter().map(|choice| choice.message.content.clone()).next().unwrap_or(Some("craig too stupid no answer here monkey oeh ah".to_string())).unwrap_or("craig too stupid no answer here monkey oeh ah".to_string()));
-            break;
+        match client.chat().create(request.clone()).await {
+            Ok(response) => {
+                resp = Some(response.choices.iter().map(|choice| choice.message.content.clone()).next().unwrap_or(Some("craig too stupid no answer here monkey oeh ah".to_string())).unwrap_or("craig too stupid no answer here monkey oeh ah".to_string()));
+                break;
+            },
+            Err(e) => println!("e: {:?}", e),
         }
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
         attempt += 1;
