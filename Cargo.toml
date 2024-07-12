@@ -8,5 +8,6 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1.21.2", features = ["macros","rt-multi-thread"] }
 serenity = "0.12.2"
-ollama-rs = "0.2.0"
 lazy_static = "1"
+anyhow = "1"
+async-openai = "0.23.4"
